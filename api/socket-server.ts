@@ -1,23 +1,14 @@
 import type { Server as HttpServer } from 'http';
 import type { ServerOptions as SocketIoServerOptions } from 'socket.io';
-import { Server as SocketIoServer } from 'socket.io';
-import { DefaultEventsMap } from 'socket.io/dist/typed-events';
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-  SocketData,
-} from './socket-server.types';
+import { SocketClient, SocketServer } from './socket-server.types';
 
 export function plug(
   server: HttpServer,
   opts?: Partial<SocketIoServerOptions>,
 ) {
-  const io = new SocketIoServer<
-    ClientToServerEvents,
-    ServerToClientEvents,
-    DefaultEventsMap,
-    SocketData
-  >(server, {
+  const searchingClients = new Map<string, SocketClient>();
+
+  const io = new SocketServer(server, {
     serveClient: false,
 
     ...opts,
@@ -25,6 +16,25 @@ export function plug(
 
   io.on('connection', (socket) => {
     console.log('Client connected');
+
+    socket.on('auth', (dataPayload) => {
+      console.log('Auth', dataPayload);
+    });
+
+    socket.on('ready', (callback) => {
+      console.log('Client ready');
+
+      const readyPayload = {
+        clientsConnected: io.sockets.sockets.size,
+        clientsSearching: searchingClients.size,
+
+        channels: [],
+      };
+
+      console.log('Sending ready payload', readyPayload);
+
+      callback(readyPayload);
+    });
 
     socket.on('searchForClient', (data) => {
       console.log(data);
